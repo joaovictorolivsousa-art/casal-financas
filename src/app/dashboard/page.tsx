@@ -4,21 +4,19 @@ import { Wallet, PiggyBank, PartyPopper, TrendingDown } from "lucide-react";
 import { Header } from "@/components/Header";
 import { FinanceCard } from "@/components/FinanceCard";
 import { DistributionSlider } from "@/components/DistributionSlider";
-import { InviteLink } from "@/components/InviteLink";
 import { useFinanceData } from "@/hooks/useFinanceData";
 import { calculateDistribution } from "@/lib/calculations";
 import { createClient } from "@/lib/supabase/client";
 
 /** "Meu Controle" — painel financeiro individual, com edição completa. */
 export default function DashboardPage() {
-  const { me, myFinance, saveMyFinance, loading, reload } = useFinanceData();
+  const { me, myFinance, saveMyFinance, loading } = useFinanceData();
   const supabase = createClient();
 
   const [netSalary, setNetSalary] = useState(0);
   const [fixedExpenses, setFixedExpenses] = useState(0);
   const [savePct, setSavePct] = useState(60);
   const [saving, setSaving] = useState(false);
-  const [inviteCode, setInviteCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (myFinance) {
@@ -51,20 +49,6 @@ export default function DashboardPage() {
       }
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function handleCreateInvite() {
-    if (!me) return;
-    const { data } = await supabase
-      .from("couples")
-      .insert({ user_a_id: me.id })
-      .select()
-      .single();
-    if (data) {
-      await supabase.from("users").update({ couple_id: data.id }).eq("id", me.id);
-      setInviteCode(data.invite_code);
-      await reload();
     }
   }
 
@@ -118,8 +102,6 @@ export default function DashboardPage() {
           <FinanceCard label="Para Lazer" value={result.paraLazer} icon={PartyPopper} tone="leisure" />
           <FinanceCard label="Gastos Fixos" value={fixedExpenses} icon={TrendingDown} tone="neutral" />
         </div>
-
-        <InviteLink coupleId={me?.couple_id ?? null} inviteCode={inviteCode} onCreateInvite={handleCreateInvite} />
       </main>
     </div>
   );

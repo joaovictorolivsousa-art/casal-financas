@@ -2,10 +2,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { IncomeExpense, Saving, UserProfile } from "@/lib/types";
+import { getStoredProfileId } from "@/lib/profile";
 
 /**
  * Hook central de dados financeiros. Busca:
- * - o perfil do usuário logado e do parceiro (se vinculado)
+ * - o perfil escolhido neste aparelho e o do parceiro (se vinculado)
  * - os lançamentos do mês corrente de ambos
  * - todos os aportes ("savings") visíveis ao casal
  *
@@ -27,13 +28,13 @@ export function useFinanceData() {
     setLoading(true);
     setError(null);
     try {
-      const { data: authUser } = await supabase.auth.getUser();
-      if (!authUser.user) throw new Error("Não autenticado.");
+      const myId = getStoredProfileId();
+      if (!myId) throw new Error("Perfil não selecionado.");
 
       const { data: meRow, error: meErr } = await supabase
         .from("users")
         .select("*")
-        .eq("id", authUser.user.id)
+        .eq("id", myId)
         .single();
       if (meErr) throw meErr;
       setMe(meRow);
@@ -84,7 +85,7 @@ export function useFinanceData() {
     load();
   }, [load]);
 
-  /** Upsert dos dados financeiros do mês corrente do usuário logado. */
+  /** Upsert dos dados financeiros do mês corrente do perfil ativo. */
   const saveMyFinance = useCallback(
     async (input: Pick<IncomeExpense, "net_salary" | "fixed_expenses" | "save_percentage" | "leisure_percentage">) => {
       if (!me) return;

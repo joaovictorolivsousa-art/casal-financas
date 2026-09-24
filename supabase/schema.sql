@@ -1,6 +1,7 @@
 -- ============================================================
 -- SCHEMA: Controle Financeiro para Casais
--- Banco: Supabase (PostgreSQL) com Row Level Security (RLS)
+-- Banco: Supabase (PostgreSQL). Sem login: o acesso é aberto via anon key (RLS liberada).
+-- Já tem o banco criado com a versão antiga? Rode supabase/migrate_remove_login.sql.
 -- ============================================================
 
 create extension if not exists "pgcrypto";
@@ -18,12 +19,12 @@ create table public.couples (
 );
 
 -- ------------------------------------------------------------
--- 2. USERS (perfil estendido do auth.users do Supabase)
+-- 2. USERS (perfis do casal — sem Supabase Auth)
 -- ------------------------------------------------------------
 create table public.users (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
   full_name text not null,
-  email text not null unique,
+  email text,
   avatar_url text,
   couple_id uuid references public.couples(id) on delete set null,
   created_at timestamptz not null default now()
@@ -75,61 +76,12 @@ alter table public.couples enable row level security;
 alter table public.incomes_expenses enable row level security;
 alter table public.savings enable row level security;
 
-create or replace function public.current_couple_id()
-returns uuid language sql stable security definer as $$
-  select couple_id from public.users where id = auth.uid();
-$$;
-
-create policy "users_select_self_or_partner"
-  on public.users for select
-  using (id = auth.uid() or couple_id = public.current_couple_id());
-
-create policy "users_update_self"
-  on public.users for update
-  using (id = auth.uid());
-
-create policy "couples_select_members"
-  on public.couples for select
-  using (auth.uid() in (user_a_id, user_b_id));
-
-create policy "couples_insert_self"
-  on public.couples for insert
-  with check (auth.uid() = user_a_id);
-
-create policy "couples_update_members"
-  on public.couples for update
-  using (auth.uid() in (user_a_id, user_b_id));
-
-create policy "finance_select_self_or_partner"
-  on public.incomes_expenses for select
-  using (
-    user_id = auth.uid()
-    or user_id in (select id from public.users where couple_id = public.current_couple_id())
-  );
-
-create policy "finance_insert_self"
-  on public.incomes_expenses for insert
-  with check (user_id = auth.uid());
-
-create policy "finance_update_self"
-  on public.incomes_expenses for update
-  using (user_id = auth.uid());
-
-create policy "finance_delete_self"
-  on public.incomes_expenses for delete
-  using (user_id = auth.uid());
-
-create policy "savings_select_couple"
-  on public.savings for select
-  using (couple_id = public.current_couple_id());
-
-create policy "savings_insert_self_or_couple"
-  on public.savings for insert
-  with check (
-    (user_id = auth.uid() and couple_id = public.current_couple_id())
-    or (user_id is null and source = 'manual' and couple_id = public.current_couple_id())
-  );
-
-create policy "savings_delete_owner"
-  on public.savings for delete
-  using (user_id = auth.uid() or (user_id is null and couple_id = public.current_couple_id()));
+-- Sem login não há auth.uid(): o casal inteiro enxerga e edita tudo.
+create policy "open_access" on public.users
+  for all to anon, authenticated using (true) with check (true);
+create policy "open_access" on public.couples
+  for all to anon, authenticated using (true) with check (true);
+create policy "open_access" on public.incomes_expenses
+  for all to anon, authenticated using (true) with check (true);
+create policy "open_access" on public.savings
+  for all to anon, authenticated using (true) with check (true);

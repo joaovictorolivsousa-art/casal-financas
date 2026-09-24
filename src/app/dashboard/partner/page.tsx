@@ -17,7 +17,7 @@ export default function PartnerDashboardPage() {
       <div>
         <Header />
         <main className="max-w-4xl mx-auto px-4 py-10 text-center text-slate-500">
-          Você ainda não está vinculado(a) a um parceiro. Gere um convite em "Meu Controle".
+          Seu par ainda não criou o perfil. Peça para abrir o app e escolher o perfil dele(a).
         </main>
       </div>
     );

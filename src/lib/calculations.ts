@@ -2,7 +2,7 @@
  * Funções puras de cálculo financeiro.
  * Sem efeitos colaterais, sem chamadas de rede — 100% testáveis isoladamente.
  */
-import { DistributionResult, CoupleTotals, Saving } from "./types";
+import { DistributionResult, CoupleTotals, ExpenseItem, ExpenseKind, Saving } from "./types";
 
 /** Saldo Livre = Salário Líquido - Gastos Fixos. Nunca retorna valor negativo oculto: o sinal é preservado. */
 export function calculateSaldoLivre(netSalary: number, fixedExpenses: number): number {
@@ -76,6 +76,11 @@ export function groupSavingsByMonth(savings: Saving[]): { month: string; total: 
   return Array.from(map.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, total]) => ({ month, total }));
+}
+
+/** Soma os itens de gasto de um determinado tipo (fixo ou variável). */
+export function sumExpensesByKind(items: ExpenseItem[], kind: ExpenseKind): number {
+  return round2(items.filter((i) => i.kind === kind).reduce((sum, i) => sum + i.amount, 0));
 }
 
 /** Formata número para BRL. */

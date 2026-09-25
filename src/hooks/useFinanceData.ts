@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { IncomeExpense, Saving, UserProfile } from "@/lib/types";
+import { ExpenseItem, ExpenseKind, IncomeExpense, Saving, UserProfile } from "@/lib/types";
 import { getStoredProfileId } from "@/lib/profile";
 
 /**
  * Hook central de dados financeiros. Busca:
  * - o perfil escolhido neste aparelho e o do parceiro (se vinculado)
- * - os lançamentos do mês corrente de ambos
+ * - os lançamentos do mês corrente de ambos (salário, renda extra, % de distribuição)
+ * - os gastos do mês corrente detalhados por categoria, de ambos
  * - todos os aportes ("savings") visíveis ao casal
  *
  * Reaproveitado pelas 3 visões: "Meu Controle", "Controle do Par", "Nosso Futuro".
@@ -18,6 +19,8 @@ export function useFinanceData() {
   const [partner, setPartner] = useState<UserProfile | null>(null);
   const [myFinance, setMyFinance] = useState<IncomeExpense | null>(null);
   const [partnerFinance, setPartnerFinance] = useState<IncomeExpense | null>(null);
+  const [myExpenses, setMyExpenses] = useState<ExpenseItem[]>([]);
+  const [partnerExpenses, setPartnerExpenses] = useState<ExpenseItem[]>([]);
   const [savings, setSavings] = useState<Saving[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +67,13 @@ export function useFinanceData() {
             .eq("reference_month", currentMonth)
             .maybeSingle();
           setPartnerFinance(pf ?? null);
+
+          const { data: pe } = await supabase
+            .from("expense_items")
+            .select("*")
+            .eq("user_id", partnerRow.id)
+            .eq("reference_month", currentMonth);
+          setPartnerExpenses(pe ?? []);
         }
       }
 
@@ -74,6 +84,13 @@ export function useFinanceData() {
         .eq("reference_month", currentMonth)
         .maybeSingle();
       setMyFinance(mf ?? null);
+
+      const { data: me_ } = await supabase
+        .from("expense_items")
+        .select("*")
+        .eq("user_id", meRow.id)
+        .eq("reference_month", currentMonth);
+      setMyExpenses(me_ ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar dados.");
     } finally {
@@ -86,24 +103,48 @@ export function useFinanceData() {
   }, [load]);
 
   /**
-   * Upsert dos dados financeiros do mês corrente do perfil ativo, e do aporte
-   * automático correspondente ("a guardar" do mês). O aporte automático é um
-   * único registro por usuário/mês: salvar de novo ATUALIZA esse registro em
+   * Upsert dos dados financeiros do mês corrente do perfil ativo (salário, renda
+   * extra, % de distribuição), da lista de gastos por categoria desse mês, e do
+   * aporte automático correspondente ("a guardar" do mês). O aporte automático é
+   * um único registro por usuário/mês: salvar de novo ATUALIZA esse registro em
    * vez de criar outro, para não duplicar o valor em "Nosso Futuro" a cada clique.
    */
   const saveMyFinance = useCallback(
     async (
-      input: Pick<IncomeExpense, "net_salary" | "fixed_expenses" | "save_percentage" | "leisure_percentage">,
+      input: Pick<IncomeExpense, "net_salary" | "extra_income" | "save_percentage" | "leisure_percentage">,
+      expenseItems: { category: string; kind: ExpenseKind; amount: number }[],
       aGuardar: number
     ) => {
       if (!me) return;
+
+      const fixedTotal = expenseItems
+        .filter((i) => i.kind === "fixed")
+        .reduce((sum, i) => sum + i.amount, 0);
+
       const { error: upsertErr } = await supabase
         .from("incomes_expenses")
         .upsert(
-          { user_id: me.id, reference_month: currentMonth, ...input },
+          { user_id: me.id, reference_month: currentMonth, ...input, fixed_expenses: fixedTotal },
           { onConflict: "user_id,reference_month" }
         );
       if (upsertErr) throw upsertErr;
+
+      // Gastos por categoria: substitui tudo do mês pela lista atual (mais simples
+      // e evita duplicar categoria ao salvar de novo).
+      const { error: deleteErr } = await supabase
+        .from("expense_items")
+        .delete()
+        .eq("user_id", me.id)
+        .eq("reference_month", currentMonth);
+      if (deleteErr) throw deleteErr;
+
+      const toInsert = expenseItems
+        .filter((i) => i.amount > 0)
+        .map((i) => ({ user_id: me.id, reference_month: currentMonth, ...i }));
+      if (toInsert.length > 0) {
+        const { error: insertItemsErr } = await supabase.from("expense_items").insert(toInsert);
+        if (insertItemsErr) throw insertItemsErr;
+      }
 
       if (me.couple_id) {
         const { data: existingAuto, error: findErr } = await supabase
@@ -156,5 +197,18 @@ export function useFinanceData() {
     [supabase, me, load]
   );
 
-  return { me, partner, myFinance, partnerFinance, savings, loading, error, saveMyFinance, addManualSaving, reload: load };
+  return {
+    me,
+    partner,
+    myFinance,
+    partnerFinance,
+    myExpenses,
+    partnerExpenses,
+    savings,
+    loading,
+    error,
+    saveMyFinance,
+    addManualSaving,
+    reload: load,
+  };
 }

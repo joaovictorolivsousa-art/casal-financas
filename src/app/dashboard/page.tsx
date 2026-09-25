@@ -4,38 +4,62 @@ import { Wallet, PiggyBank, PartyPopper, TrendingDown } from "lucide-react";
 import { Header } from "@/components/Header";
 import { FinanceCard } from "@/components/FinanceCard";
 import { DistributionSlider } from "@/components/DistributionSlider";
+import { ExpenseItemsEditor } from "@/components/ExpenseItemsEditor";
 import { useFinanceData } from "@/hooks/useFinanceData";
 import { calculateDistribution } from "@/lib/calculations";
+import { EXPENSE_CATEGORIES, FIXED_CATEGORIES, VARIABLE_CATEGORIES } from "@/lib/expense-categories";
+import { ExpenseKind } from "@/lib/types";
 
 /** "Meu Controle" — painel financeiro individual, com edição completa. */
 export default function DashboardPage() {
-  const { me, myFinance, saveMyFinance, loading } = useFinanceData();
+  const { me, myFinance, myExpenses, saveMyFinance, loading } = useFinanceData();
 
   const [netSalary, setNetSalary] = useState(0);
-  const [fixedExpenses, setFixedExpenses] = useState(0);
+  const [extraIncome, setExtraIncome] = useState(0);
+  const [expenseAmounts, setExpenseAmounts] = useState<Record<string, number>>({});
   const [savePct, setSavePct] = useState(60);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (myFinance) {
       setNetSalary(myFinance.net_salary);
-      setFixedExpenses(myFinance.fixed_expenses);
+      setExtraIncome(myFinance.extra_income ?? 0);
       setSavePct(myFinance.save_percentage);
     }
   }, [myFinance]);
 
-  const result = calculateDistribution(netSalary, fixedExpenses, savePct, 100 - savePct);
+  useEffect(() => {
+    const amounts: Record<string, number> = {};
+    for (const item of myExpenses) amounts[item.category] = item.amount;
+    setExpenseAmounts(amounts);
+  }, [myExpenses]);
+
+  const fixedTotal = FIXED_CATEGORIES.reduce((sum, c) => sum + (expenseAmounts[c.id] ?? 0), 0);
+  const variableTotal = VARIABLE_CATEGORIES.reduce((sum, c) => sum + (expenseAmounts[c.id] ?? 0), 0);
+
+  const totalIncome = netSalary + extraIncome;
+  const result = calculateDistribution(totalIncome, fixedTotal, savePct, 100 - savePct);
+
+  function handleExpenseChange(categoryId: string, amount: number) {
+    setExpenseAmounts((prev) => ({ ...prev, [categoryId]: amount }));
+  }
 
   async function handleSave() {
     setSaving(true);
     try {
+      const items = EXPENSE_CATEGORIES.map((c) => ({
+        category: c.id,
+        kind: c.kind as ExpenseKind,
+        amount: expenseAmounts[c.id] ?? 0,
+      }));
       await saveMyFinance(
         {
           net_salary: netSalary,
-          fixed_expenses: fixedExpenses,
+          extra_income: extraIncome,
           save_percentage: savePct,
           leisure_percentage: 100 - savePct,
         },
+        items,
         result.aGuardar
       );
     } finally {
@@ -66,15 +90,18 @@ export default function DashboardPage() {
               />
             </label>
             <label className="text-sm">
-              <span className="block mb-1 font-medium text-slate-600">Gastos Fixos Totais (R$)</span>
+              <span className="block mb-1 font-medium text-slate-600">Renda Extra (R$)</span>
               <input
                 type="number"
-                value={fixedExpenses}
-                onChange={(e) => setFixedExpenses(Number(e.target.value))}
+                value={extraIncome}
+                onChange={(e) => setExtraIncome(Number(e.target.value))}
                 className="w-full border rounded-lg px-3 py-2"
+                placeholder="Freela, bônus, 13º..."
               />
             </label>
           </div>
+
+          <ExpenseItemsEditor values={expenseAmounts} onChange={handleExpenseChange} paraLazer={result.paraLazer} />
 
           <DistributionSlider savePercentage={savePct} onChange={(s) => setSavePct(s)} />
 
@@ -87,11 +114,12 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <FinanceCard label="Saldo Livre" value={result.saldoLivre} icon={Wallet} tone={result.saldoLivre < 0 ? "danger" : "neutral"} />
           <FinanceCard label="A Guardar / Investir" value={result.aGuardar} icon={PiggyBank} tone="save" />
           <FinanceCard label="Para Lazer" value={result.paraLazer} icon={PartyPopper} tone="leisure" />
-          <FinanceCard label="Gastos Fixos" value={fixedExpenses} icon={TrendingDown} tone="neutral" />
+          <FinanceCard label="Gastos Fixos" value={fixedTotal} icon={TrendingDown} tone="neutral" />
+          <FinanceCard label="Gastos Variáveis" value={variableTotal} icon={TrendingDown} tone={variableTotal > result.paraLazer ? "danger" : "neutral"} />
         </div>
       </main>
     </div>

@@ -19,9 +19,22 @@ export interface IncomeExpense {
   user_id: string;
   reference_month: string; // ISO date, dia 1 do mês
   net_salary: number;
+  extra_income: number;
   fixed_expenses: number;
   save_percentage: number;
   leisure_percentage: number;
+}
+
+export type ExpenseKind = "fixed" | "variable";
+
+/** Um lançamento de gasto por categoria, num mês, de um perfil. */
+export interface ExpenseItem {
+  id: string;
+  user_id: string;
+  reference_month: string;
+  category: string; // id de ExpenseCategoryConfig
+  kind: ExpenseKind;
+  amount: number;
 }
 
 export interface Saving {

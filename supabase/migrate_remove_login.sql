@@ -26,11 +26,15 @@ drop policy if exists "savings_delete_owner" on public.savings;
 drop function if exists public.current_couple_id();
 
 -- ...e entra o acesso aberto (o casal inteiro enxerga e edita tudo)
+drop policy if exists "open_access" on public.users;
 create policy "open_access" on public.users
   for all to anon, authenticated using (true) with check (true);
+drop policy if exists "open_access" on public.couples;
 create policy "open_access" on public.couples
   for all to anon, authenticated using (true) with check (true);
+drop policy if exists "open_access" on public.incomes_expenses;
 create policy "open_access" on public.incomes_expenses
   for all to anon, authenticated using (true) with check (true);
+drop policy if exists "open_access" on public.savings;
 create policy "open_access" on public.savings
   for all to anon, authenticated using (true) with check (true);

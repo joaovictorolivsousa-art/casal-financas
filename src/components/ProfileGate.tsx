@@ -2,79 +2,96 @@
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getStoredProfileId, setStoredProfileId } from "@/lib/profile";
-import { UserProfile } from "@/lib/types";
+import { Couple, UserProfile } from "@/lib/types";
+
+/** Os dois únicos perfis do app. Mude aqui se um dia os nomes mudarem. */
+const PROFILE_NAMES = ["João", "Daya"] as const;
 
 /**
- * Substitui o login: pergunta "quem é você?" uma única vez por aparelho.
- * O app tem um único casal — o primeiro perfil criado abre o casal e o segundo entra nele.
+ * Substitui o login. Não há tela de cadastro: na primeira vez que o app roda,
+ * garante no banco que existem um casal e os perfis João e Daya (cria o que
+ * faltar). Depois disso só pergunta "quem é você?" uma vez por aparelho.
  */
 export function ProfileGate({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const [status, setStatus] = useState<"loading" | "pick" | "ready">("loading");
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadProfiles = useCallback(async () => {
-    const { data, error: loadErr } = await supabase.from("users").select("*").order("created_at");
-    if (loadErr) {
-      setError(loadErr.message);
-      setStatus("pick");
-      return;
+  const ensureProfiles = useCallback(async (): Promise<UserProfile[]> => {
+    // 1. Garante que existe um casal.
+    const { data: existingCouple, error: coupleLoadErr } = await supabase
+      .from("couples")
+      .select("*")
+      .order("created_at")
+      .limit(1)
+      .maybeSingle();
+    if (coupleLoadErr) throw coupleLoadErr;
+
+    let couple = existingCouple as Couple | null;
+    if (!couple) {
+      const { data: created, error: coupleErr } = await supabase
+        .from("couples")
+        .insert({ status: "active" })
+        .select()
+        .single();
+      if (coupleErr) throw coupleErr;
+      couple = created as Couple;
     }
-    const list = (data ?? []) as UserProfile[];
-    setProfiles(list);
-    const stored = getStoredProfileId();
-    setStatus(stored && list.some((p) => p.id === stored) ? "ready" : "pick");
+
+    // 2. Garante que João e Daya existem, vinculados a esse casal.
+    const { data: existingUsers, error: usersErr } = await supabase
+      .from("users")
+      .select("*")
+      .in("full_name", PROFILE_NAMES as unknown as string[]);
+    if (usersErr) throw usersErr;
+
+    let all = (existingUsers ?? []) as UserProfile[];
+    const missing = PROFILE_NAMES.filter((name) => !all.some((u) => u.full_name === name));
+    if (missing.length > 0) {
+      const { data: inserted, error: insertErr } = await supabase
+        .from("users")
+        .insert(missing.map((full_name) => ({ full_name, couple_id: couple!.id })))
+        .select();
+      if (insertErr) throw insertErr;
+      all = [...all, ...((inserted ?? []) as UserProfile[])];
+    }
+
+    // 3. Vincula o casal aos dois perfis, se ainda não estiver.
+    const joao = all.find((u) => u.full_name === "João");
+    const daya = all.find((u) => u.full_name === "Daya");
+    if (joao && daya && (couple.user_a_id !== joao.id || couple.user_b_id !== daya.id || couple.status !== "active")) {
+      await supabase
+        .from("couples")
+        .update({ user_a_id: joao.id, user_b_id: daya.id, status: "active" })
+        .eq("id", couple.id);
+    }
+
+    return PROFILE_NAMES.map((name) => all.find((u) => u.full_name === name)).filter(
+      (u): u is UserProfile => Boolean(u)
+    );
   }, [supabase]);
 
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      const all = await ensureProfiles();
+      setProfiles(all);
+      const stored = getStoredProfileId();
+      setStatus(stored && all.some((p) => p.id === stored) ? "ready" : "pick");
+    } catch (err) {
+      setError((err as { message?: string })?.message ?? "Erro ao carregar os perfis.");
+      setStatus("pick");
+    }
+  }, [ensureProfiles]);
+
   useEffect(() => {
-    loadProfiles();
-  }, [loadProfiles]);
+    load();
+  }, [load]);
 
   function choose(id: string) {
     setStoredProfileId(id);
     setStatus("ready");
-  }
-
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    const fullName = name.trim();
-    if (!fullName) return;
-    setBusy(true);
-    setError(null);
-    try {
-      let coupleId = profiles.find((p) => p.couple_id)?.couple_id ?? null;
-      if (!coupleId) {
-        const { data: couple, error: coupleErr } = await supabase
-          .from("couples")
-          .insert({ status: "pending" })
-          .select()
-          .single();
-        if (coupleErr) throw coupleErr;
-        coupleId = couple.id as string;
-      }
-
-      const { data: created, error: userErr } = await supabase
-        .from("users")
-        .insert({ full_name: fullName, couple_id: coupleId })
-        .select()
-        .single();
-      if (userErr) throw userErr;
-
-      const link =
-        profiles.length === 0 ? { user_a_id: created.id } : { user_b_id: created.id, status: "active" };
-      await supabase.from("couples").update(link).eq("id", coupleId);
-
-      setStoredProfileId(created.id);
-      setName("");
-      await loadProfiles();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao criar perfil.");
-    } finally {
-      setBusy(false);
-    }
   }
 
   if (status === "loading") return <div className="p-8 text-center text-slate-400">Carregando...</div>;
@@ -85,44 +102,30 @@ export function ProfileGate({ children }: { children: React.ReactNode }) {
       <div className="w-full max-w-sm bg-white border rounded-2xl p-6 space-y-4">
         <h1 className="text-xl font-semibold text-center">💰 Nós Dois & Dinheiro</h1>
 
-        {profiles.length > 0 && (
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-600">Quem é você?</p>
-            {profiles.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => choose(p.id)}
-                className="w-full border rounded-lg px-3 py-2 text-sm text-left hover:bg-slate-50"
-              >
-                Sou {p.full_name.split(" ")[0]}
-              </button>
-            ))}
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-slate-600">Quem é você?</p>
+          {profiles.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => choose(p.id)}
+              className="w-full border rounded-lg px-3 py-2 text-sm text-left hover:bg-slate-50"
+            >
+              Sou {p.full_name}
+            </button>
+          ))}
+          {profiles.length === 0 && !error && (
+            <p className="text-sm text-slate-400">Preparando os perfis...</p>
+          )}
+        </div>
+
+        {error && (
+          <div className="text-xs text-rose-600 space-y-1">
+            <p>{error}</p>
+            <button onClick={load} className="underline">
+              Tentar de novo
+            </button>
           </div>
         )}
-
-        {profiles.length < 2 && (
-          <form onSubmit={handleCreate} className="space-y-2 border-t pt-4 first:border-t-0 first:pt-0">
-            <p className="text-sm font-medium text-slate-600">
-              {profiles.length === 0 ? "Crie o seu perfil" : "Seu par ainda não está aqui? Crie o seu perfil"}
-            </p>
-            <input
-              required
-              placeholder="Seu nome"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full border rounded-lg px-3 py-2 text-sm"
-            />
-            <button
-              type="submit"
-              disabled={busy}
-              className="w-full bg-slate-900 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50"
-            >
-              {busy ? "Aguarde..." : "Criar perfil"}
-            </button>
-          </form>
-        )}
-
-        {error && <p className="text-xs text-rose-600">{error}</p>}
       </div>
     </div>
   );

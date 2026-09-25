@@ -49,11 +49,11 @@ npm run dev
 Acesse `http://localhost:3000`.
 
 ### 5. Teste o fluxo do casal
-1. Abra o app e crie o perfil da **Pessoa A** ("Quem é você?").
-2. Em uma aba anônima (ou outro aparelho), abra o app e crie o perfil da **Pessoa B** — ela entra automaticamente no mesmo casal.
+1. Abra o app. Na primeira vez, ele cria sozinho o casal e os dois perfis (**João** e **Daya** — nomes fixos em `PROFILE_NAMES`, em `src/components/ProfileGate.tsx`) e mostra "Quem é você?".
+2. Escolha um perfil no seu aparelho; em outro aparelho (ou aba anônima), escolha o outro.
 3. Ambos enxergam o painel um do outro (somente leitura) e a aba "Nosso Futuro" soma os dois. "Trocar perfil" no cabeçalho volta à escolha.
 
-> Já tinha o banco criado com o login antigo? Rode `supabase/migrate_remove_login.sql` uma vez no SQL Editor.
+> Já tinha o banco criado com o login antigo? Rode `supabase/migrate_remove_login.sql` uma vez no SQL Editor. Não é preciso rodar `seed_casal.sql`: o app cria João e Daya sozinho no primeiro acesso — o script fica só como alternativa manual.
 
 ## Motor de distribuição (regra de negócio)
 

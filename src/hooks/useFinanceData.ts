@@ -85,9 +85,17 @@ export function useFinanceData() {
     load();
   }, [load]);
 
-  /** Upsert dos dados financeiros do mês corrente do perfil ativo. */
+  /**
+   * Upsert dos dados financeiros do mês corrente do perfil ativo, e do aporte
+   * automático correspondente ("a guardar" do mês). O aporte automático é um
+   * único registro por usuário/mês: salvar de novo ATUALIZA esse registro em
+   * vez de criar outro, para não duplicar o valor em "Nosso Futuro" a cada clique.
+   */
   const saveMyFinance = useCallback(
-    async (input: Pick<IncomeExpense, "net_salary" | "fixed_expenses" | "save_percentage" | "leisure_percentage">) => {
+    async (
+      input: Pick<IncomeExpense, "net_salary" | "fixed_expenses" | "save_percentage" | "leisure_percentage">,
+      aGuardar: number
+    ) => {
       if (!me) return;
       const { error: upsertErr } = await supabase
         .from("incomes_expenses")
@@ -96,6 +104,36 @@ export function useFinanceData() {
           { onConflict: "user_id,reference_month" }
         );
       if (upsertErr) throw upsertErr;
+
+      if (me.couple_id) {
+        const { data: existingAuto, error: findErr } = await supabase
+          .from("savings")
+          .select("id")
+          .eq("user_id", me.id)
+          .eq("source", "auto")
+          .eq("reference_date", currentMonth)
+          .maybeSingle();
+        if (findErr) throw findErr;
+
+        if (existingAuto) {
+          const { error: updateErr } = await supabase
+            .from("savings")
+            .update({ amount: aGuardar })
+            .eq("id", existingAuto.id);
+          if (updateErr) throw updateErr;
+        } else {
+          const { error: insertErr } = await supabase.from("savings").insert({
+            user_id: me.id,
+            couple_id: me.couple_id,
+            amount: aGuardar,
+            source: "auto",
+            description: "Distribuição automática do mês",
+            reference_date: currentMonth,
+          });
+          if (insertErr) throw insertErr;
+        }
+      }
+
       await load();
     },
     [supabase, me, currentMonth, load]

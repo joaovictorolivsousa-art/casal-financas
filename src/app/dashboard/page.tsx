@@ -6,12 +6,10 @@ import { FinanceCard } from "@/components/FinanceCard";
 import { DistributionSlider } from "@/components/DistributionSlider";
 import { useFinanceData } from "@/hooks/useFinanceData";
 import { calculateDistribution } from "@/lib/calculations";
-import { createClient } from "@/lib/supabase/client";
 
 /** "Meu Controle" — painel financeiro individual, com edição completa. */
 export default function DashboardPage() {
   const { me, myFinance, saveMyFinance, loading } = useFinanceData();
-  const supabase = createClient();
 
   const [netSalary, setNetSalary] = useState(0);
   const [fixedExpenses, setFixedExpenses] = useState(0);
@@ -31,22 +29,15 @@ export default function DashboardPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      await saveMyFinance({
-        net_salary: netSalary,
-        fixed_expenses: fixedExpenses,
-        save_percentage: savePct,
-        leisure_percentage: 100 - savePct,
-      });
-      // Registra automaticamente o valor "a guardar" como aporte do mês
-      if (me?.couple_id) {
-        await supabase.from("savings").insert({
-          user_id: me.id,
-          couple_id: me.couple_id,
-          amount: result.aGuardar,
-          source: "auto",
-          description: "Distribuição automática do mês",
-        });
-      }
+      await saveMyFinance(
+        {
+          net_salary: netSalary,
+          fixed_expenses: fixedExpenses,
+          save_percentage: savePct,
+          leisure_percentage: 100 - savePct,
+        },
+        result.aGuardar
+      );
     } finally {
       setSaving(false);
     }

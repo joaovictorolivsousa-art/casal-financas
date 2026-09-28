@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { ExpenseItem, ExpenseKind, IncomeExpense, Saving, UserProfile } from "@/lib/types";
+import { ExpenseItem, ExpenseKind, Goal, IncomeExpense, Saving, UserProfile } from "@/lib/types";
 import { getStoredProfileId } from "@/lib/profile";
 
 /**
@@ -22,6 +22,7 @@ export function useFinanceData() {
   const [myExpenses, setMyExpenses] = useState<ExpenseItem[]>([]);
   const [partnerExpenses, setPartnerExpenses] = useState<ExpenseItem[]>([]);
   const [savings, setSavings] = useState<Saving[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +59,13 @@ export function useFinanceData() {
           .eq("couple_id", meRow.couple_id)
           .order("reference_date", { ascending: true });
         setSavings(savingsRows ?? []);
+
+        const { data: goalRows } = await supabase
+          .from("goals")
+          .select("*")
+          .eq("couple_id", meRow.couple_id)
+          .order("created_at", { ascending: true });
+        setGoals(goalRows ?? []);
 
         if (partnerRow) {
           const { data: pf } = await supabase
@@ -197,6 +205,28 @@ export function useFinanceData() {
     [supabase, me, load]
   );
 
+  /** Cria uma meta do casal (ex.: "Geladeira", R$ 3.500). */
+  const addGoal = useCallback(
+    async (title: string, targetAmount: number) => {
+      if (!me?.couple_id) throw new Error("Vincule-se a um parceiro primeiro.");
+      const { error: insertErr } = await supabase
+        .from("goals")
+        .insert({ couple_id: me.couple_id, title, target_amount: targetAmount });
+      if (insertErr) throw insertErr;
+      await load();
+    },
+    [supabase, me, load]
+  );
+
+  const deleteGoal = useCallback(
+    async (id: string) => {
+      const { error: deleteErr } = await supabase.from("goals").delete().eq("id", id);
+      if (deleteErr) throw deleteErr;
+      await load();
+    },
+    [supabase, load]
+  );
+
   return {
     me,
     partner,
@@ -205,10 +235,13 @@ export function useFinanceData() {
     myExpenses,
     partnerExpenses,
     savings,
+    goals,
     loading,
     error,
     saveMyFinance,
     addManualSaving,
+    addGoal,
+    deleteGoal,
     reload: load,
   };
 }

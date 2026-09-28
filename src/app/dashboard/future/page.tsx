@@ -4,12 +4,13 @@ import { Heart, Plus } from "lucide-react";
 import { Header } from "@/components/Header";
 import { FinanceCard } from "@/components/FinanceCard";
 import { CoupleChart } from "@/components/CoupleChart";
+import { GoalsSection } from "@/components/GoalsSection";
 import { useFinanceData } from "@/hooks/useFinanceData";
-import { calculateCoupleTotals, groupSavingsByMonth } from "@/lib/calculations";
+import { allocateToGoals, calculateCoupleTotals, groupSavingsByMonth } from "@/lib/calculations";
 
 /** "Nosso Futuro" — visão consolidada do patrimônio acumulado pelo casal. */
 export default function FutureDashboardPage() {
-  const { me, partner, savings, loading, addManualSaving } = useFinanceData();
+  const { me, partner, savings, goals, loading, addManualSaving, addGoal, deleteGoal } = useFinanceData();
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -18,6 +19,7 @@ export default function FutureDashboardPage() {
 
   const totals = calculateCoupleTotals(savings, me?.id ?? "", partner?.id);
   const evolution = groupSavingsByMonth(savings);
+  const goalProgress = allocateToGoals(goals, totals.totalGeral);
 
   async function handleAddManual(e: React.FormEvent) {
     e.preventDefault();
@@ -47,6 +49,8 @@ export default function FutureDashboardPage() {
           <FinanceCard label={partner?.full_name?.split(" ")[0] ?? "Parceiro(a)"} value={totals.totalUserB} icon={Heart} />
           <FinanceCard label="Aportes Manuais" value={totals.totalManual} icon={Heart} tone="leisure" />
         </div>
+
+        <GoalsSection progress={goalProgress} onAdd={addGoal} onDelete={deleteGoal} />
 
         <CoupleChart data={evolution} />
 

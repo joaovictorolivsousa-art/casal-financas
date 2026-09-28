@@ -5,7 +5,7 @@ import { FinanceCard } from "@/components/FinanceCard";
 import { DistributionSlider } from "@/components/DistributionSlider";
 import { ExpenseItemsEditor } from "@/components/ExpenseItemsEditor";
 import { useFinanceData } from "@/hooks/useFinanceData";
-import { calculateDistribution } from "@/lib/calculations";
+import { calculateDistribution, calculateSaldoRestante, sumExpensesByKind } from "@/lib/calculations";
 
 /** "Controle do Par" — mesmo layout do dashboard individual, porém 100% somente leitura. */
 export default function PartnerDashboardPage() {
@@ -27,6 +27,9 @@ export default function PartnerDashboardPage() {
   const finance = partnerFinance ?? { net_salary: 0, extra_income: 0, fixed_expenses: 0, save_percentage: 60, leisure_percentage: 40 };
   const totalIncome = finance.net_salary + (finance.extra_income ?? 0);
   const result = calculateDistribution(totalIncome, finance.fixed_expenses, finance.save_percentage, finance.leisure_percentage);
+
+  const variableTotal = sumExpensesByKind(partnerExpenses, "variable");
+  const saldoRestante = calculateSaldoRestante(result.saldoLivre, variableTotal);
 
   const expenseAmounts: Record<string, number> = {};
   for (const item of partnerExpenses) expenseAmounts[item.category] = item.amount;
@@ -56,11 +59,12 @@ export default function PartnerDashboardPage() {
           <DistributionSlider savePercentage={finance.save_percentage} onChange={() => {}} readOnly />
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <FinanceCard label="Saldo Livre" value={result.saldoLivre} icon={Wallet} />
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <FinanceCard label="Saldo Livre" value={saldoRestante} icon={Wallet} tone={saldoRestante < 0 ? "danger" : "neutral"} />
           <FinanceCard label="A Guardar / Investir" value={result.aGuardar} icon={PiggyBank} tone="save" />
           <FinanceCard label="Para Lazer" value={result.paraLazer} icon={PartyPopper} tone="leisure" />
           <FinanceCard label="Gastos Fixos" value={finance.fixed_expenses} icon={TrendingDown} />
+          <FinanceCard label="Gastos Variáveis" value={variableTotal} icon={TrendingDown} tone={variableTotal > result.paraLazer ? "danger" : "neutral"} />
         </div>
       </main>
     </div>

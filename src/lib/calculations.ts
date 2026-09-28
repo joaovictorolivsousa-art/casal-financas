@@ -2,11 +2,20 @@
  * Funções puras de cálculo financeiro.
  * Sem efeitos colaterais, sem chamadas de rede — 100% testáveis isoladamente.
  */
-import { DistributionResult, CoupleTotals, ExpenseItem, ExpenseKind, Saving } from "./types";
+import { DistributionResult, CoupleTotals, ExpenseItem, ExpenseKind, Goal, Saving } from "./types";
 
 /** Saldo Livre = Salário Líquido - Gastos Fixos. Nunca retorna valor negativo oculto: o sinal é preservado. */
 export function calculateSaldoLivre(netSalary: number, fixedExpenses: number): number {
   return round2(netSalary - fixedExpenses);
+}
+
+/**
+ * Saldo Livre "de verdade" do mês: o que sobra depois dos gastos fixos E dos variáveis.
+ * A divisão guardar/lazer continua sendo calculada sobre (renda - fixos), como um plano;
+ * os variáveis saem do saldo à medida que são lançados.
+ */
+export function calculateSaldoRestante(saldoLivre: number, variableExpenses: number): number {
+  return round2(saldoLivre - variableExpenses);
 }
 
 /** Valida se duas porcentagens somam exatamente 100 (com tolerância de arredondamento). */
@@ -81,6 +90,24 @@ export function groupSavingsByMonth(savings: Saving[]): { month: string; total: 
 /** Soma os itens de gasto de um determinado tipo (fixo ou variável). */
 export function sumExpensesByKind(items: ExpenseItem[], kind: ExpenseKind): number {
   return round2(items.filter((i) => i.kind === kind).reduce((sum, i) => sum + i.amount, 0));
+}
+
+/**
+ * Distribui o total guardado pelas metas, na ordem de criação: a primeira meta
+ * enche antes de a segunda começar a receber.
+ */
+export function allocateToGoals(
+  goals: Goal[],
+  totalSaved: number
+): { goal: Goal; saved: number; remaining: number; pct: number }[] {
+  let pool = Math.max(totalSaved, 0);
+  return goals.map((goal) => {
+    const saved = round2(Math.min(pool, goal.target_amount));
+    pool = round2(pool - saved);
+    const remaining = round2(goal.target_amount - saved);
+    const pct = goal.target_amount > 0 ? Math.min(100, Math.round((saved / goal.target_amount) * 100)) : 0;
+    return { goal, saved, remaining, pct };
+  });
 }
 
 /** Formata número para BRL. */

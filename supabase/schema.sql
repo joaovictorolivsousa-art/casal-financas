@@ -79,6 +79,29 @@ create table public.expense_items (
   created_at timestamptz not null default now()
 );
 
+-- ------------------------------------------------------------
+-- 6. GOALS (metas do casal: quanto juntar e para quê)
+-- ------------------------------------------------------------
+create table public.goals (
+  id uuid primary key default gen_random_uuid(),
+  couple_id uuid not null references public.couples(id) on delete cascade,
+  title text not null, -- motivação, ex.: "Geladeira"
+  target_amount numeric(12,2) not null check (target_amount > 0),
+  created_at timestamptz not null default now()
+);
+
+-- ------------------------------------------------------------
+-- 7. PUSH_SUBSCRIPTIONS (aparelhos que ativaram os lembretes por notificação)
+-- ------------------------------------------------------------
+create table public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+
 create index idx_incomes_expenses_user_month on public.incomes_expenses(user_id, reference_month);
 create index idx_savings_couple on public.savings(couple_id, reference_date);
 create index idx_expense_items_user_month on public.expense_items(user_id, reference_month);
@@ -91,6 +114,8 @@ alter table public.couples enable row level security;
 alter table public.incomes_expenses enable row level security;
 alter table public.savings enable row level security;
 alter table public.expense_items enable row level security;
+alter table public.goals enable row level security;
+alter table public.push_subscriptions enable row level security;
 
 -- Sem login não há auth.uid(): o casal inteiro enxerga e edita tudo.
 create policy "open_access" on public.users
@@ -102,4 +127,8 @@ create policy "open_access" on public.incomes_expenses
 create policy "open_access" on public.savings
   for all to anon, authenticated using (true) with check (true);
 create policy "open_access" on public.expense_items
+  for all to anon, authenticated using (true) with check (true);
+create policy "open_access" on public.goals
+  for all to anon, authenticated using (true) with check (true);
+create policy "open_access" on public.push_subscriptions
   for all to anon, authenticated using (true) with check (true);

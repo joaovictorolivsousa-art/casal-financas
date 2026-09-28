@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Wallet, Users, Heart, UserRound } from "lucide-react";
 import { clearStoredProfileId } from "@/lib/profile";
+import { NotificationsToggle } from "@/components/NotificationsToggle";
 
 const TABS = [
   { href: "/dashboard", label: "Meu Controle", icon: Wallet },
@@ -37,16 +38,19 @@ export function Header() {
           })}
         </nav>
 
-        <button
-          onClick={() => {
-            clearStoredProfileId();
-            window.location.reload();
-          }}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 self-start sm:self-auto"
-        >
-          <UserRound className="h-4 w-4" />
-          Trocar perfil
-        </button>
+        <div className="flex items-center gap-4 self-start sm:self-auto">
+          <NotificationsToggle />
+          <button
+            onClick={() => {
+              clearStoredProfileId();
+              window.location.reload();
+            }}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800"
+          >
+            <UserRound className="h-4 w-4" />
+            Trocar perfil
+          </button>
+        </div>
       </div>
     </header>
   );

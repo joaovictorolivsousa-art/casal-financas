@@ -6,6 +6,7 @@ App web para casais gerenciarem finanças com **autonomia individual** e **metas
 
 - **Frontend:** Next.js 15 (App Router) + Tailwind CSS + Lucide React + Recharts
 - **Backend:** Supabase (PostgreSQL). Sem login: os dois enxergam o controle um do outro
+- **Gastos:** por categoria (fixos e variáveis), com sugestão de quanto gastar em cada categoria variável — ver `src/lib/expense-categories.ts`
 - **Lógica de negócio:** funções puras em TypeScript (`src/lib/calculations.ts`), sem dependência de framework — fáceis de testar isoladamente
 
 ## Estrutura de pastas
@@ -54,6 +55,7 @@ Acesse `http://localhost:3000`.
 3. Ambos enxergam o painel um do outro (somente leitura) e a aba "Nosso Futuro" soma os dois. "Trocar perfil" no cabeçalho volta à escolha.
 
 > Já tinha o banco criado com o login antigo? Rode `supabase/migrate_remove_login.sql` uma vez no SQL Editor. Não é preciso rodar `seed_casal.sql`: o app cria João e Daya sozinho no primeiro acesso — o script fica só como alternativa manual.
+> Já tinha o banco criado antes de renda extra e gastos por categoria existirem? Rode `supabase/add_expenses_tracking.sql` uma vez.
 
 ## Motor de distribuição (regra de negócio)
 
@@ -78,3 +80,16 @@ Para Lazer  = max(Saldo Livre, 0) × (% Lazer / 100)
 - Histórico mensal navegável (atualmente mostra só o mês corrente).
 - Notificações quando o parceiro atualiza os dados.
 - Exportação de relatório em PDF.
+
+## Lembretes por notificação (PWA)
+
+O app pode ser instalado na tela inicial e avisa, de vez em quando, quanto ainda dá para gastar com lazer e quanto falta para as metas.
+
+1. Rode `supabase/add_push_and_goals.sql` uma vez no SQL Editor (cria as tabelas de metas e de inscrições).
+2. Gere o par de chaves **no seu PC** (a privada não deve passar por chat nem ir para o Git): `npx web-push generate-vapid-keys`
+3. No Netlify (Site configuration → Environment variables) crie: `NEXT_PUBLIC_VAPID_PUBLIC_KEY` (chave pública), `VAPID_PRIVATE_KEY` (chave privada) e `VAPID_SUBJECT` (ex.: `mailto:seu@email.com`).
+4. No `.env.local` coloque só `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
+5. Faça um novo deploy (Trigger deploy → Clear cache and deploy site).
+6. Em cada aparelho, abra o app, escolha o perfil e toque em **Ativar lembretes**.
+
+A função `netlify/functions/send-reminders.mjs` roda agendada (segunda e quinta, 21h no horário de Brasília). No iPhone, as notificações só funcionam com o app adicionado à Tela de Início (iOS 16.4+).

@@ -25,6 +25,15 @@ export interface IncomeExpense {
   leisure_percentage: number;
 }
 
+/** Meta de quanto juntar, com a motivação (ex.: "Geladeira"). Compartilhada pelo casal. */
+export interface Goal {
+  id: string;
+  couple_id: string;
+  title: string;
+  target_amount: number;
+  created_at: string;
+}
+
 export type ExpenseKind = "fixed" | "variable";
 
 /** Um lançamento de gasto por categoria, num mês, de um perfil. */

@@ -6,7 +6,7 @@ import { FinanceCard } from "@/components/FinanceCard";
 import { DistributionSlider } from "@/components/DistributionSlider";
 import { ExpenseItemsEditor } from "@/components/ExpenseItemsEditor";
 import { useFinanceData } from "@/hooks/useFinanceData";
-import { calculateDistribution } from "@/lib/calculations";
+import { calculateDistribution, calculateSaldoRestante } from "@/lib/calculations";
 import { EXPENSE_CATEGORIES, FIXED_CATEGORIES, VARIABLE_CATEGORIES } from "@/lib/expense-categories";
 import { ExpenseKind } from "@/lib/types";
 
@@ -39,6 +39,7 @@ export default function DashboardPage() {
 
   const totalIncome = netSalary + extraIncome;
   const result = calculateDistribution(totalIncome, fixedTotal, savePct, 100 - savePct);
+  const saldoRestante = calculateSaldoRestante(result.saldoLivre, variableTotal);
 
   function handleExpenseChange(categoryId: string, amount: number) {
     setExpenseAmounts((prev) => ({ ...prev, [categoryId]: amount }));
@@ -115,7 +116,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <FinanceCard label="Saldo Livre" value={result.saldoLivre} icon={Wallet} tone={result.saldoLivre < 0 ? "danger" : "neutral"} />
+          <FinanceCard label="Saldo Livre" value={saldoRestante} icon={Wallet} tone={saldoRestante < 0 ? "danger" : "neutral"} />
           <FinanceCard label="A Guardar / Investir" value={result.aGuardar} icon={PiggyBank} tone="save" />
           <FinanceCard label="Para Lazer" value={result.paraLazer} icon={PartyPopper} tone="leisure" />
           <FinanceCard label="Gastos Fixos" value={fixedTotal} icon={TrendingDown} tone="neutral" />

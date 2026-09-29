@@ -5,7 +5,7 @@ import { FinanceCard } from "@/components/FinanceCard";
 import { DistributionSlider } from "@/components/DistributionSlider";
 import { ExpenseItemsEditor } from "@/components/ExpenseItemsEditor";
 import { useFinanceData } from "@/hooks/useFinanceData";
-import { calculateDistribution, calculateSaldoRestante, sumExpensesByKind } from "@/lib/calculations";
+import { calculateDistribution, calculateSaldoRestante, formatBRL, sumExpensesByKind } from "@/lib/calculations";
 
 /** "Controle do Par" — mesmo layout do dashboard individual, porém 100% somente leitura. */
 export default function PartnerDashboardPage() {
@@ -30,6 +30,7 @@ export default function PartnerDashboardPage() {
 
   const variableTotal = sumExpensesByKind(partnerExpenses, "variable");
   const saldoRestante = calculateSaldoRestante(result.saldoLivre, variableTotal);
+  const lazerRestante = Math.round((result.paraLazer - variableTotal) * 100) / 100;
 
   const expenseAmounts: Record<string, number> = {};
   for (const item of partnerExpenses) expenseAmounts[item.category] = item.amount;
@@ -62,7 +63,13 @@ export default function PartnerDashboardPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <FinanceCard label="Saldo Livre" value={saldoRestante} icon={Wallet} tone={saldoRestante < 0 ? "danger" : "neutral"} />
           <FinanceCard label="A Guardar / Investir" value={result.aGuardar} icon={PiggyBank} tone="save" />
-          <FinanceCard label="Para Lazer" value={result.paraLazer} icon={PartyPopper} tone="leisure" />
+          <FinanceCard
+            label="Para Lazer (restante)"
+            value={lazerRestante}
+            icon={PartyPopper}
+            tone={lazerRestante < 0 ? "danger" : "leisure"}
+            hint={`de ${formatBRL(result.paraLazer)} planejado`}
+          />
           <FinanceCard label="Gastos Fixos" value={finance.fixed_expenses} icon={TrendingDown} />
           <FinanceCard label="Gastos Variáveis" value={variableTotal} icon={TrendingDown} tone={variableTotal > result.paraLazer ? "danger" : "neutral"} />
         </div>

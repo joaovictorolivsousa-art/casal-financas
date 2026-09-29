@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Wallet, Users, Heart, UserRound } from "lucide-react";
+import { Wallet, Users, Heart, History, UserRound } from "lucide-react";
 import { clearStoredProfileId } from "@/lib/profile";
 import { NotificationsToggle } from "@/components/NotificationsToggle";
 
@@ -9,6 +9,7 @@ const TABS = [
   { href: "/dashboard", label: "Meu Controle", icon: Wallet },
   { href: "/dashboard/partner", label: "Controle do Par", icon: Users },
   { href: "/dashboard/future", label: "Nosso Futuro", icon: Heart },
+  { href: "/dashboard/history", label: "Histórico", icon: History },
 ];
 
 /** Cabeçalho com o toggle entre as 3 visões da aplicação. */

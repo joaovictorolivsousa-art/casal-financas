@@ -36,6 +36,17 @@ export interface Goal {
 
 export type ExpenseKind = "fixed" | "variable";
 
+/** Resumo de um mês fechado de uma pessoa, para a aba Histórico. */
+export interface MonthSummary {
+  month: string; // ISO, dia 1 do mês
+  income: number; // salário + renda extra
+  fixed: number;
+  variable: number;
+  saldoRestante: number; // renda - fixos - variáveis
+  aGuardar: number; // parte do plano de guardar (renda - fixos) x % escolhida
+  byCategory: { category: string; kind: ExpenseKind; amount: number }[];
+}
+
 /** Um lançamento de gasto por categoria, num mês, de um perfil. */
 export interface ExpenseItem {
   id: string;

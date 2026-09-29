@@ -6,6 +6,8 @@ interface FinanceCardProps {
   value: number;
   icon: LucideIcon;
   tone?: "save" | "leisure" | "neutral" | "danger";
+  /** Linha pequena abaixo do valor, ex.: "de R$ 1.200 planejado". */
+  hint?: string;
 }
 
 const toneStyles: Record<NonNullable<FinanceCardProps["tone"]>, string> = {
@@ -16,7 +18,7 @@ const toneStyles: Record<NonNullable<FinanceCardProps["tone"]>, string> = {
 };
 
 /** Card simples de resultado financeiro, usado no dashboard individual e do parceiro. */
-export function FinanceCard({ label, value, icon: Icon, tone = "neutral" }: FinanceCardProps) {
+export function FinanceCard({ label, value, icon: Icon, tone = "neutral", hint }: FinanceCardProps) {
   return (
     <div className={`rounded-2xl border p-4 sm:p-5 flex items-center gap-4 ${toneStyles[tone]}`}>
       <div className="shrink-0 rounded-xl bg-white/60 p-2.5">
@@ -25,6 +27,7 @@ export function FinanceCard({ label, value, icon: Icon, tone = "neutral" }: Fina
       <div className="min-w-0">
         <p className="text-xs sm:text-sm font-medium opacity-80">{label}</p>
         <p className="text-lg sm:text-2xl font-semibold truncate">{formatBRL(value)}</p>
+        {hint && <p className="text-xs opacity-70 truncate">{hint}</p>}
       </div>
     </div>
   );

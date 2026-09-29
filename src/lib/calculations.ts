@@ -2,7 +2,7 @@
  * Funções puras de cálculo financeiro.
  * Sem efeitos colaterais, sem chamadas de rede — 100% testáveis isoladamente.
  */
-import { DistributionResult, CoupleTotals, ExpenseItem, ExpenseKind, Goal, Saving } from "./types";
+import { DistributionResult, CoupleTotals, ExpenseItem, ExpenseKind, Goal, IncomeExpense, MonthSummary, Saving } from "./types";
 
 /** Saldo Livre = Salário Líquido - Gastos Fixos. Nunca retorna valor negativo oculto: o sinal é preservado. */
 export function calculateSaldoLivre(netSalary: number, fixedExpenses: number): number {
@@ -108,6 +108,41 @@ export function allocateToGoals(
     const pct = goal.target_amount > 0 ? Math.min(100, Math.round((saved / goal.target_amount) * 100)) : 0;
     return { goal, saved, remaining, pct };
   });
+}
+
+/** Monta o resumo de cada mês salvo (mais recente primeiro) a partir dos lançamentos e gastos por categoria. */
+export function buildMonthlyHistory(finances: IncomeExpense[], expenses: ExpenseItem[]): MonthSummary[] {
+  return finances
+    .map((f) => {
+      const items = expenses.filter((e) => e.user_id === f.user_id && e.reference_month === f.reference_month);
+      const income = round2(Number(f.net_salary) + Number(f.extra_income ?? 0));
+      const fixed = round2(Number(f.fixed_expenses));
+      const variable = sumExpensesByKind(items, "variable");
+      const saldoLivre = calculateSaldoLivre(income, fixed);
+      return {
+        month: f.reference_month,
+        income,
+        fixed,
+        variable,
+        saldoRestante: calculateSaldoRestante(saldoLivre, variable),
+        aGuardar: round2(Math.max(saldoLivre, 0) * (Number(f.save_percentage) / 100)),
+        byCategory: items
+          .filter((i) => Number(i.amount) > 0)
+          .map((i) => ({ category: i.category, kind: i.kind, amount: Number(i.amount) })),
+      };
+    })
+    .sort((a, b) => b.month.localeCompare(a.month));
+}
+
+/** "2026-09-01" -> "Setembro de 2026" (long) ou "set/26" (short). */
+export function formatMonth(isoMonth: string, style: "long" | "short" = "long"): string {
+  const date = new Date(`${isoMonth.slice(0, 7)}-01T12:00:00`);
+  if (style === "short") {
+    const m = date.toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+    return `${m}/${String(date.getFullYear()).slice(2)}`;
+  }
+  const label = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 /** Formata número para BRL. */

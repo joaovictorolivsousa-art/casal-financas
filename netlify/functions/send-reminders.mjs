@@ -11,6 +11,14 @@ const VAPID_PUBLIC = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:contato@example.com";
 
+// Apelidos usados nas notificações no lugar do nome (chave: primeiro nome, minúsculo).
+const NICKNAMES = { daya: "amor" };
+
+function greetingName(user) {
+  const first = user.full_name.split(" ")[0];
+  return NICKNAMES[first.toLowerCase()] ?? first;
+}
+
 const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
 
 async function sb(path) {
@@ -83,7 +91,7 @@ export default async () => {
     }
 
     const payload = JSON.stringify({
-      title: user ? `Oi, ${user.full_name.split(" ")[0]}!` : "Nós Dois & Dinheiro",
+      title: user ? `Oi, ${greetingName(user)}!` : "Nós Dois & Dinheiro",
       body: lines.join(" "),
       url: "/dashboard",
     });

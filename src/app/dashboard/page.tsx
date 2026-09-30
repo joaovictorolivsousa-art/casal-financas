@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Wallet, PiggyBank, PartyPopper, TrendingDown } from "lucide-react";
+import { Wallet, PiggyBank, PartyPopper, TrendingDown, History } from "lucide-react";
 import { Header } from "@/components/Header";
 import { FinanceCard } from "@/components/FinanceCard";
 import { DistributionSlider } from "@/components/DistributionSlider";
@@ -12,13 +12,15 @@ import { ExpenseKind } from "@/lib/types";
 
 /** "Meu Controle" — painel financeiro individual, com edição completa. */
 export default function DashboardPage() {
-  const { me, myFinance, myExpenses, saveMyFinance, loading } = useFinanceData();
+  const { me, myFinance, myExpenses, saveMyFinance, loadPreviousMonth, loading } = useFinanceData();
 
   const [netSalary, setNetSalary] = useState(0);
   const [extraIncome, setExtraIncome] = useState(0);
   const [expenseAmounts, setExpenseAmounts] = useState<Record<string, number>>({});
   const [savePct, setSavePct] = useState(60);
   const [saving, setSaving] = useState(false);
+  const [loadingPrevious, setLoadingPrevious] = useState(false);
+  const [previousMessage, setPreviousMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (myFinance) {
@@ -44,6 +46,32 @@ export default function DashboardPage() {
 
   function handleExpenseChange(categoryId: string, amount: number) {
     setExpenseAmounts((prev) => ({ ...prev, [categoryId]: amount }));
+  }
+
+  async function handleUsePreviousMonth() {
+    const hasData = netSalary > 0 || FIXED_CATEGORIES.some((c) => (expenseAmounts[c.id] ?? 0) > 0);
+    if (hasData && !window.confirm("Isso substitui o Salário Líquido e os Gastos Fixos atuais pelos valores do último mês salvo. Continuar?")) {
+      return;
+    }
+    setLoadingPrevious(true);
+    setPreviousMessage(null);
+    try {
+      const previous = await loadPreviousMonth();
+      if (!previous) {
+        setPreviousMessage("Ainda não há um mês anterior salvo.");
+        return;
+      }
+      setNetSalary(previous.netSalary);
+      setExpenseAmounts((prev) => {
+        const next = { ...prev };
+        for (const cat of FIXED_CATEGORIES) next[cat.id] = previous.fixedByCategory[cat.id] ?? 0;
+        return next;
+      });
+    } catch (e) {
+      setPreviousMessage((e as { message?: string })?.message ?? "Não foi possível buscar o mês anterior.");
+    } finally {
+      setLoadingPrevious(false);
+    }
   }
 
   async function handleSave() {
@@ -81,6 +109,22 @@ export default function DashboardPage() {
         </div>
 
         <div className="bg-white border rounded-2xl p-4 sm:p-5 space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-sm font-medium text-slate-600">Este mês</p>
+            <div className="flex flex-col items-end">
+              <button
+                type="button"
+                onClick={handleUsePreviousMonth}
+                disabled={loadingPrevious}
+                className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 disabled:opacity-50"
+              >
+                <History className="h-3.5 w-3.5" />
+                {loadingPrevious ? "Buscando..." : "Usar valores do mês anterior"}
+              </button>
+              {previousMessage && <span className="text-xs text-slate-400">{previousMessage}</span>}
+            </div>
+          </div>
+
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="text-sm">
               <span className="block mb-1 font-medium text-slate-600">Salário Líquido (R$)</span>

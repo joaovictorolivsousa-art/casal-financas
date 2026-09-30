@@ -1,10 +1,18 @@
-// Função agendada do Netlify: lembrete de quanto ainda dá para gastar com lazer.
-// Horário (UTC): terça e sexta 00:00 = segunda e quinta 21:00 no horário de Brasília.
-// Para mudar a frequência, altere o cron abaixo.
+// Função agendada do Netlify: resumo do mês que fechou.
+// Horário (UTC): dia 1 às 12:00 = 9h no horário de Brasília.
 import webpush from "web-push";
-import { brl, currentMonthISO, financeForMonth, firstOpenGoal, greetingName, round2, sbClient } from "./_shared/finance.mjs";
+import {
+  brl,
+  financeForMonth,
+  firstOpenGoal,
+  greetingName,
+  monthLabel,
+  previousMonthISO,
+  round2,
+  sbClient,
+} from "./_shared/finance.mjs";
 
-export const config = { schedule: "0 0 * * 2,5" };
+export const config = { schedule: "0 12 1 * *" };
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -20,15 +28,16 @@ export default async () => {
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
   const sb = sbClient(SUPABASE_URL, SUPABASE_KEY);
 
-  const month = currentMonthISO();
+  const month = previousMonthISO();
+  const label = monthLabel(month);
 
   const [subs, users, finances, expenses, goals, savings] = await Promise.all([
     sb.get("push_subscriptions?select=*"),
     sb.get("users?select=id,full_name,couple_id"),
     sb.get(`incomes_expenses?reference_month=eq.${month}&select=*`),
-    sb.get(`expense_items?reference_month=eq.${month}&kind=eq.variable&select=user_id,amount`),
+    sb.get(`expense_items?reference_month=eq.${month}&select=user_id,category,kind,amount`),
     sb.get("goals?select=*&order=created_at.asc"),
-    sb.get("savings?select=couple_id,amount"),
+    sb.get("savings?select=couple_id,user_id,amount,source,reference_date"),
   ]);
 
   let sent = 0;
@@ -38,15 +47,27 @@ export default async () => {
     const lines = [];
 
     if (!finance) {
-      lines.push("Você ainda não registrou este mês. Abra o app e salve seus valores 👀");
+      lines.push(`Você não fechou ${label} — sem registro para resumir.`);
     } else {
-      const userVariable = expenses.filter((e) => e.user_id === sub.user_id);
-      const { saldoRestante } = financeForMonth(finance, userVariable);
-      lines.push(
-        saldoRestante >= 0
-          ? `Você ainda pode gastar ${brl(saldoRestante)} com lazer este mês.`
-          : `Você passou ${brl(Math.abs(saldoRestante))} do lazer previsto este mês.`
+      const userItems = expenses.filter((e) => e.user_id === sub.user_id);
+      const { income, fixed, variable, saldoRestante } = financeForMonth(
+        finance,
+        userItems.filter((e) => e.kind === "variable")
       );
+
+      const guardado = savings.find(
+        (s) => s.user_id === sub.user_id && s.source === "auto" && s.reference_date === month
+      );
+
+      lines.push(
+        `${label}: renda ${brl(income)}, gastos ${brl(round2(fixed + variable))} (${brl(variable)} em variáveis), sobrou ${brl(saldoRestante)}.`
+      );
+      if (guardado) lines.push(`Guardado: ${brl(Number(guardado.amount))}.`);
+
+      const topVariable = [...userItems.filter((e) => e.kind === "variable")].sort(
+        (a, b) => Number(b.amount) - Number(a.amount)
+      )[0];
+      if (topVariable) lines.push(`Maior gasto variável: ${brl(Number(topVariable.amount))}.`);
     }
 
     if (user?.couple_id) {
@@ -58,9 +79,9 @@ export default async () => {
     }
 
     const payload = JSON.stringify({
-      title: user ? `Oi, ${greetingName(user)}!` : "Nós Dois & Dinheiro",
+      title: user ? `Fechamos ${label}, ${greetingName(user)}!` : `Fechamos ${label}!`,
       body: lines.join(" "),
-      url: "/dashboard",
+      url: "/dashboard/history",
     });
 
     try {

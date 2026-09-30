@@ -227,6 +227,42 @@ export function useFinanceData() {
     [supabase, load]
   );
 
+  /**
+   * Busca o salário e os gastos fixos do último mês salvo antes do atual (não precisa
+   * ser o mês imediatamente anterior — pega o mais recente que existir). Usado pelo
+   * botão "Usar valores do mês anterior", para poupar o casal de digitar tudo de novo.
+   */
+  const loadPreviousMonth = useCallback(async (): Promise<{
+    netSalary: number;
+    fixedByCategory: Record<string, number>;
+  } | null> => {
+    if (!me) return null;
+
+    const { data: prevFinance, error: prevErr } = await supabase
+      .from("incomes_expenses")
+      .select("*")
+      .eq("user_id", me.id)
+      .lt("reference_month", currentMonth)
+      .order("reference_month", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (prevErr) throw prevErr;
+    if (!prevFinance) return null;
+
+    const { data: prevExpenses, error: expErr } = await supabase
+      .from("expense_items")
+      .select("*")
+      .eq("user_id", me.id)
+      .eq("reference_month", prevFinance.reference_month)
+      .eq("kind", "fixed");
+    if (expErr) throw expErr;
+
+    const fixedByCategory: Record<string, number> = {};
+    for (const item of prevExpenses ?? []) fixedByCategory[item.category] = item.amount;
+
+    return { netSalary: prevFinance.net_salary, fixedByCategory };
+  }, [supabase, me, currentMonth]);
+
   return {
     me,
     partner,
@@ -242,6 +278,7 @@ export function useFinanceData() {
     addManualSaving,
     addGoal,
     deleteGoal,
+    loadPreviousMonth,
     reload: load,
   };
 }

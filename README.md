@@ -92,4 +92,8 @@ O app pode ser instalado na tela inicial e avisa, de vez em quando, quanto ainda
 5. Faça um novo deploy (Trigger deploy → Clear cache and deploy site).
 6. Em cada aparelho, abra o app, escolha o perfil e toque em **Ativar lembretes**.
 
-A função `netlify/functions/send-reminders.mjs` roda agendada (segunda e quinta, 21h no horário de Brasília). No iPhone, as notificações só funcionam com o app adicionado à Tela de Início (iOS 16.4+).
+Duas funções agendadas rodam com as mesmas variáveis:
+- `send-reminders.mjs` — segunda e quinta, 21h (horário de Brasília): quanto ainda dá para gastar com lazer.
+- `month-closing.mjs` — dia 1 de cada mês, 9h (horário de Brasília): resumo do mês anterior (renda, gastos, quanto sobrou/guardou e o maior gasto variável).
+
+Os dois compartilham as fórmulas de cálculo em `netlify/functions/_shared/finance.mjs`. No iPhone, as notificações só funcionam com o app adicionado à Tela de Início (iOS 16.4+).

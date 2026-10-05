@@ -205,13 +205,20 @@ export function useFinanceData() {
     [supabase, me, load]
   );
 
-  /** Cria uma meta do casal (ex.: "Geladeira", R$ 3.500). */
+  /**
+   * Cria uma meta (ex.: "Geladeira", R$ 3.500). "shared" é meta do casal, visível em
+   * Nosso Futuro e alimentada pelo total guardado pelos dois. "personal" é meta de
+   * uma pessoa só, visível no próprio Controle, alimentada só pelo que ELA guardou.
+   */
   const addGoal = useCallback(
-    async (title: string, targetAmount: number) => {
+    async (title: string, targetAmount: number, scope: "shared" | "personal" = "shared") => {
       if (!me?.couple_id) throw new Error("Vincule-se a um parceiro primeiro.");
-      const { error: insertErr } = await supabase
-        .from("goals")
-        .insert({ couple_id: me.couple_id, title, target_amount: targetAmount });
+      const { error: insertErr } = await supabase.from("goals").insert({
+        couple_id: me.couple_id,
+        user_id: scope === "personal" ? me.id : null,
+        title,
+        target_amount: targetAmount,
+      });
       if (insertErr) throw insertErr;
       await load();
     },
@@ -263,6 +270,12 @@ export function useFinanceData() {
     return { netSalary: prevFinance.net_salary, fixedByCategory };
   }, [supabase, me, currentMonth]);
 
+  // `goals` guarda TUDO que o casal tem (compartilhadas + pessoais dos dois); cada
+  // visão usa só a fatia que importa, para não misturar o "pote" de cada uma.
+  const sharedGoals = goals.filter((g) => !g.user_id);
+  const myGoals = me ? goals.filter((g) => g.user_id === me.id) : [];
+  const partnerGoals = partner ? goals.filter((g) => g.user_id === partner.id) : [];
+
   return {
     me,
     partner,
@@ -271,7 +284,9 @@ export function useFinanceData() {
     myExpenses,
     partnerExpenses,
     savings,
-    goals,
+    goals: sharedGoals,
+    myGoals,
+    partnerGoals,
     loading,
     error,
     saveMyFinance,

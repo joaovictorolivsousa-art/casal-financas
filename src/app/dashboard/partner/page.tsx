@@ -4,12 +4,19 @@ import { Header } from "@/components/Header";
 import { FinanceCard } from "@/components/FinanceCard";
 import { DistributionSlider } from "@/components/DistributionSlider";
 import { ExpenseItemsEditor } from "@/components/ExpenseItemsEditor";
+import { GoalsSection } from "@/components/GoalsSection";
 import { useFinanceData } from "@/hooks/useFinanceData";
-import { calculateDistribution, calculateSaldoRestante, formatBRL, sumExpensesByKind } from "@/lib/calculations";
+import {
+  allocateToGoals,
+  calculateDistribution,
+  calculateSaldoRestante,
+  formatBRL,
+  sumExpensesByKind,
+} from "@/lib/calculations";
 
 /** "Controle do Par" — mesmo layout do dashboard individual, porém 100% somente leitura. */
 export default function PartnerDashboardPage() {
-  const { partner, partnerFinance, partnerExpenses, loading } = useFinanceData();
+  const { partner, partnerFinance, partnerExpenses, savings, partnerGoals, loading } = useFinanceData();
 
   if (loading) return <div className="p-8 text-center text-slate-400">Carregando...</div>;
 
@@ -34,6 +41,11 @@ export default function PartnerDashboardPage() {
 
   const expenseAmounts: Record<string, number> = {};
   for (const item of partnerExpenses) expenseAmounts[item.category] = item.amount;
+
+  const partnerTotalSaved = savings
+    .filter((s) => s.user_id === partner.id)
+    .reduce((sum, s) => sum + s.amount, 0);
+  const partnerGoalProgress = allocateToGoals(partnerGoals, partnerTotalSaved);
 
   return (
     <div>
@@ -73,6 +85,15 @@ export default function PartnerDashboardPage() {
           <FinanceCard label="Gastos Fixos" value={finance.fixed_expenses} icon={TrendingDown} />
           <FinanceCard label="Gastos Variáveis" value={variableTotal} icon={TrendingDown} tone={variableTotal > result.paraLazer ? "danger" : "neutral"} />
         </div>
+
+        <GoalsSection
+          progress={partnerGoalProgress}
+          onAdd={async () => {}}
+          onDelete={async () => {}}
+          heading={`Metas Pessoais de ${partner.full_name.split(" ")[0]}`}
+          emptyText="Sem metas pessoais por enquanto."
+          readOnly
+        />
       </main>
     </div>
   );

@@ -29,6 +29,8 @@ export interface IncomeExpense {
 export interface Goal {
   id: string;
   couple_id: string;
+  /** null = meta do casal (Nosso Futuro); preenchido = meta pessoal dessa pessoa. */
+  user_id?: string | null;
   title: string;
   target_amount: number;
   created_at: string;

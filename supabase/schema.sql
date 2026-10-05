@@ -85,6 +85,7 @@ create table public.expense_items (
 create table public.goals (
   id uuid primary key default gen_random_uuid(),
   couple_id uuid not null references public.couples(id) on delete cascade,
+  user_id uuid references public.users(id) on delete cascade, -- null = meta do casal; preenchido = meta pessoal
   title text not null, -- motivação, ex.: "Geladeira"
   target_amount numeric(12,2) not null check (target_amount > 0),
   created_at timestamptz not null default now()

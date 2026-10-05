@@ -5,14 +5,16 @@ import { Header } from "@/components/Header";
 import { FinanceCard } from "@/components/FinanceCard";
 import { DistributionSlider } from "@/components/DistributionSlider";
 import { ExpenseItemsEditor } from "@/components/ExpenseItemsEditor";
+import { GoalsSection } from "@/components/GoalsSection";
 import { useFinanceData } from "@/hooks/useFinanceData";
-import { calculateDistribution, calculateSaldoRestante, formatBRL } from "@/lib/calculations";
+import { allocateToGoals, calculateDistribution, calculateSaldoRestante, formatBRL } from "@/lib/calculations";
 import { EXPENSE_CATEGORIES, FIXED_CATEGORIES, VARIABLE_CATEGORIES } from "@/lib/expense-categories";
 import { ExpenseKind } from "@/lib/types";
 
 /** "Meu Controle" — painel financeiro individual, com edição completa. */
 export default function DashboardPage() {
-  const { me, myFinance, myExpenses, saveMyFinance, loadPreviousMonth, loading } = useFinanceData();
+  const { me, myFinance, myExpenses, savings, myGoals, saveMyFinance, addGoal, deleteGoal, loadPreviousMonth, loading } =
+    useFinanceData();
 
   const [netSalary, setNetSalary] = useState(0);
   const [extraIncome, setExtraIncome] = useState(0);
@@ -43,6 +45,11 @@ export default function DashboardPage() {
   const result = calculateDistribution(totalIncome, fixedTotal, savePct, 100 - savePct);
   const saldoRestante = calculateSaldoRestante(result.saldoLivre, variableTotal);
   const lazerRestante = Math.round((result.paraLazer - variableTotal) * 100) / 100;
+
+  const myTotalSaved = savings
+    .filter((s) => s.user_id === me?.id)
+    .reduce((sum, s) => sum + s.amount, 0);
+  const myGoalProgress = allocateToGoals(myGoals, myTotalSaved);
 
   function handleExpenseChange(categoryId: string, amount: number) {
     setExpenseAmounts((prev) => ({ ...prev, [categoryId]: amount }));
@@ -173,6 +180,15 @@ export default function DashboardPage() {
           <FinanceCard label="Gastos Fixos" value={fixedTotal} icon={TrendingDown} tone="neutral" />
           <FinanceCard label="Gastos Variáveis" value={variableTotal} icon={TrendingDown} tone={variableTotal > result.paraLazer ? "danger" : "neutral"} />
         </div>
+
+        <GoalsSection
+          progress={myGoalProgress}
+          onAdd={(title, amount) => addGoal(title, amount, "personal")}
+          onDelete={deleteGoal}
+          heading="Minhas Metas Pessoais"
+          emptyText='Nenhuma meta pessoal ainda. Ex.: "Curso", "Viagem com os amigos".'
+          poolHint="O que você mesmo(a) já guardou (seus aportes automáticos de cada mês) enche suas metas, na ordem em que foram criadas."
+        />
       </main>
     </div>
   );

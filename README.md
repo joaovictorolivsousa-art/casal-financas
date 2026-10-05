@@ -81,6 +81,10 @@ Para Lazer  = max(Saldo Livre, 0) × (% Lazer / 100)
 - Notificações quando o parceiro atualiza os dados.
 - Exportação de relatório em PDF.
 
+## Metas pessoais
+
+Além das metas do casal (em "Nosso Futuro"), cada pessoa tem suas próprias metas em "Meu Controle" — ex.: "Curso", "Viagem com os amigos". Elas são alimentadas só pelo que a própria pessoa guardou (seus aportes automáticos de cada mês), não pelo total do casal. Aparecem também, só para ver, na tela "Controle do Par". Rode `supabase/add_personal_goals.sql` uma vez no SQL Editor se o banco já existia antes dessa mudança.
+
 ## Lembretes por notificação (PWA)
 
 O app pode ser instalado na tela inicial e avisa, de vez em quando, quanto ainda dá para gastar com lazer e quanto falta para as metas.
